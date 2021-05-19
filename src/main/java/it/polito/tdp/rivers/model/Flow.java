@@ -3,6 +3,7 @@ package it.polito.tdp.rivers.model;
 import java.time.LocalDate;
 
 public class Flow {
+	
 	private LocalDate day;
 	private double flow;
 	private River river;

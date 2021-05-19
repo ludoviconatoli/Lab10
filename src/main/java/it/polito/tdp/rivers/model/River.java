@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class River {
+	
 	private int id;
 	private String name;
 	private double flowAvg;
