@@ -1,9 +1,11 @@
 package it.polito.tdp.rivers.db;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import it.polito.tdp.rivers.model.FiumeSelezionato;
+
+import it.polito.tdp.rivers.model.Flow;
 import it.polito.tdp.rivers.model.River;
 
 import java.sql.Connection;
@@ -39,28 +41,26 @@ public class RiversDAO {
 		return rivers;
 	}
 	
-	public FiumeSelezionato getFiume(River r) {
-		String sql="SELECT f.day, MAX(f.day) as m, count(*) AS c, AVG(f.flow) AS fl "
-				+ "FROM flow f "
-				+ "WHERE river = ? "
-				+ "ORDER BY f.day";
+	public List<Flow> getFlows(River river){
+		String sql="SELECT id, day, flow FROM flow WHERE river=?";
 		
-		FiumeSelezionato f ;
+		List<Flow> flows = new LinkedList<>();
 		try {
 			Connection conn = DBConnect.getConnection();
 			PreparedStatement st = conn.prepareStatement(sql);
-			st.setInt(1, r.getId());
+			st.setInt(1, river.getId());
 			
 			ResultSet res = st.executeQuery();
-			if(res.next()) {
-				LocalDate d1 = res.getDate("f.day").toLocalDate();
-				LocalDate d2 = res.getDate("m").toLocalDate();	
-				f = new FiumeSelezionato(d1, d2, res.getInt("c"), res.getDouble("fl"));
-				res.close();
-				st.close();
-				conn.close();
-				return f;
+			while(res.next()) {
+				LocalDate d1 = res.getDate("day").toLocalDate();
+					
+				flows.add(new Flow(d1, res.getDouble("flow"), river));
+				
 			}
+			
+			Collections.sort(flows);
+			river.setFlows(flows);
+			
 			res.close();
 			st.close();
 			conn.close();
@@ -68,6 +68,7 @@ public class RiversDAO {
 		}catch(SQLException e) {
 			System.out.println("Errore in getFiume()");
 		}
-		return null;
+		return flows;
 	}
+	
 }

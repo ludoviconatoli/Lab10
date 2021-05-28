@@ -6,91 +6,117 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 import it.polito.tdp.rivers.db.RiversDAO;
-import it.polito.tdp.rivers.model.Event.EventType;
 
 public class Model {
 
 	public List<River> fiumi;
-	public RiversDAO dao;
+	public RiversDAO dao = new RiversDAO();
+	private PriorityQueue<Flow> queue;
 	
 	public Model() {
-		fiumi = new ArrayList<>();
-		dao = new RiversDAO();
-	}
-	
-	private PriorityQueue<Event> queue;
-	
-	//Parametri statici
-	double portata;
-	double capacitaIniziale;
-	double flussoUscitaMinimo;
-	LocalDate primoGiorno;
-	LocalDate ultimoGiorno;
-	
-	//Stato del sistema
-	int contaGiorni;
-	double sommaCapacita;
-	
-	//Uscita
-	int giorniFalliti;
-	double capacitaMedia;
-	
-	
-	public int getGiorniFalliti() {
-		return this.giorniFalliti ;
-	}
-
-	public double getCapacitaMedia() {
-		return this.capacitaMedia ;
-	}
-
-	public void run(LocalDate inizio, LocalDate fine, double fattore, double mediaFlusso){
 		
-		this.queue = new PriorityQueue<>();
-		portata = fattore*mediaFlusso*30;
-		capacitaIniziale = portata/2;
-		flussoUscitaMinimo = 0.8*mediaFlusso;
+		fiumi = dao.getAllRivers();
 		
-		contaGiorni = 1;
-		capacitaMedia = capacitaIniziale/contaGiorni;
-		sommaCapacita = capacitaIniziale;
-		
-		giorniFalliti=0;
-		
-		while(inizio.isBefore(fine)) {
-			this.queue.add(new Event(inizio, EventType.RIEMPIMENTO));
-			inizio = inizio.plusDays(1);
-		}
-		
-		while(!this.queue.isEmpty()) {
-			Event e = this.queue.poll();
-			processEvent(e);
+		for(River r: fiumi) {
+			dao.getFlows(r);
 		}
 	}
 	
-	private void processEvent(Event e) {
-		switch(e.getType()) {
-		case RIEMPIMENTO:
-			this.capacitaIniziale = capacitaIniziale + Math.random()*50;
-			if(capacitaIniziale > this.portata)
-				capacitaIniziale = portata;
+	public List<River> getRivers(){
+		return fiumi;
+	}
+	
+	public LocalDate getStartDate(River river) {
+		if(!river.getFlows().isEmpty()) {
+			return river.getFlows().get(0).getDay();
+		}
+		
+		return null;
+	}
+	
+	public LocalDate getEndDate(River river) {
+		if(!river.getFlows().isEmpty()) {
+			return river.getFlows().get(river.getFlows().size()-1).getDay();
+		}
+		
+		return null;
+	}
+	
+	public int getNumMeasurements(River river) {
+		return river.getFlows().size();
+	}
+	
+	public double getFMed(River river) {
+		double avg = 0;
+		
+		for(Flow f: river.getFlows())
+			avg += f.getFlow();
+		
+		avg /= river.getFlows().size();
+		river.setFlowAvg(avg);
+		
+		return avg;
+	}
+	
+	public SimulationResult simulate(River river, double k) {
+		
+		this.queue = new PriorityQueue<Flow>();
+		this.queue.addAll(river.getFlows());
+		
+		List<Double> capacity = new ArrayList<Double>();
+		double Q = k*30* convertM3SecToM3Day(river.getFlowAvg());
+		double C = Q/2;
+		double fOutMin = convertM3SecToM3Day(0.8 * river.getFlowAvg());
+		int numberOfDays = 0;
+		
+		System.out.println("Q: " + Q);
+		
+		Flow flow;
+		while((flow = this.queue.poll()) != null) {
+			System.out.println("Date: " + flow.getDay());
 			
-			this.queue.add(new Event(e.getDay(), EventType.PRELIEVO));
-			sommaCapacita += capacitaIniziale;
-			this.contaGiorni++;
-			this.capacitaMedia = this.sommaCapacita/this.contaGiorni;
+			double fOut = fOutMin;
 			
-			break;
-			
-		case PRELIEVO:
-			if(this.capacitaIniziale < this.flussoUscitaMinimo) {
-				this.capacitaIniziale = 0;
-				this.giorniFalliti++;
-				
-			}else {
-				this.capacitaIniziale -= this.flussoUscitaMinimo;
+			if(Math.random() > 0.95) {
+				fOut = 10*fOutMin;
+				System.out.println("10xfOutMin");
 			}
-			break;
+			
+			System.out.println("fOut: " + fOut);
+			System.out.println("fIn: " + convertM3SecToM3Day(flow.getFlow()));
+			
+			C += convertM3SecToM3Day(flow.getFlow());
+			
+			if(C>Q) {
+				C = Q;
+			}
+			
+			if(C < fOut) {
+				numberOfDays++;
+				C=0;
+			}else {
+				C -= fOut; 
+			}
+			
+			System.out.println("C: " + C + "\n");
+			capacity.add(C);
 		}
+		
+		double CAvg = 0;
+		for(Double d: capacity) {
+			CAvg += d;
+		}
+		
+		CAvg = CAvg/capacity.size();
+		return new SimulationResult(CAvg, numberOfDays);
 	}
+	
+	public double convertM3SecToM3Day(double input) {
+		return input * 60 * 60 *24;
+	}
+	
+	public double convertM3DayToM3Sec(double input) {
+		return input / 60 / 60 / 24;
+	}
+	
 }

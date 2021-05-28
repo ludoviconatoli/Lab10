@@ -11,9 +11,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ResourceBundle;
 
 import it.polito.tdp.rivers.db.RiversDAO;
-import it.polito.tdp.rivers.model.FiumeSelezionato;
 import it.polito.tdp.rivers.model.Model;
 import it.polito.tdp.rivers.model.River;
+import it.polito.tdp.rivers.model.SimulationResult;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -24,10 +24,6 @@ import javafx.scene.control.TextField;
 public class FXMLController {
 	
 	private Model model;
-	private RiversDAO dao;
-	private LocalDate dataInizio;
-	private LocalDate dataFine;
-	private double media;
 	
 
     @FXML // ResourceBundle that was given to the FXMLLoader
@@ -63,48 +59,33 @@ public class FXMLController {
     @FXML
     void doInsericsci(ActionEvent event) {
     	
-    	River fiume = this.boxRiver.getValue();
     	
-    	FiumeSelezionato fs = dao.getFiume(fiume);
-    	double d = fs.getMedia()*3600*24;
-    	DecimalFormat df = new DecimalFormat("#.##");
-    	
-    	this.dataInizio = fs.getPrima();
-    	this.dataFine = fs.getFine();
-    	this.media = fs.getMedia();
-    	
-    	this.txtStartDate.setText(fs.getPrima().toString());
-    	this.txtEndDate.setText(fs.getFine().toString());
-    	this.txtNumMeasurements.setText(fs.getTotMisurazioni()+"");
-    	this.txtFMed.setText(df.format(d));
+    	River newValue = boxRiver.getValue();
+    	if(newValue != null) {
+	    	txtStartDate.setText(model.getStartDate(newValue).toString());
+			txtEndDate.setText(model.getEndDate(newValue).toString());
+			txtNumMeasurements.setText(String.valueOf(model.getNumMeasurements(newValue)));
+			txtFMed.setText(String.valueOf(model.getFMed(newValue)));
+    	}
     }
     
     @FXML
     void doSimula(ActionEvent event) {
     	this.txtResult.clear();
-    	River r = this.boxRiver.getValue();
-    	String s = this.txtK.getText();
-    	if(s == null) {
-    		this.txtResult.setText("Devi inserire un numero");
-    	}
-    	
-    	double k;
     	try {
-    		k = Double.parseDouble(s);
-    	}catch(NumberFormatException e) {
-    		this.txtResult.setText("Devi inserire un numero");
-    		return;
-    	}
+			double k = Double.parseDouble(txtK.getText());
+			
+			SimulationResult sr = model.simulate(boxRiver.getValue(), k);
+			
+			txtResult.setText("Numero di giorni \"critici\": "
+					+ sr.getNumberOfDays() + "\n");
+			txtResult.appendText("Occupazione media del bacino: " + sr.getAvgC() + "\n");
+			txtResult.appendText("SIMULAZIONE TERMINATA!\n");
+		} catch (NumberFormatException nfe) {
+			txtResult.setText("Devi inserire un valore numerico per il fattore k");
+		}
     	
-    	if(r == null ) {
-    		this.txtResult.setText("Devi selezionare un fiume");
-    		return;
-    	}
     	
-    	this.model.run(this.dataInizio, this.dataFine, k, this.media);
-    	this.txtResult.appendText("Considerando il fiume " + this.boxRiver.getValue().toString() +"\n\n");
-    	this.txtResult.appendText("I giorni in cui non si è riusciti a soddisfare la richiesta sono: " + this.model.getGiorniFalliti() +"\n");
-    	this.txtResult.appendText("La capacità media del fiume è stata: " + this.model.getCapacitaMedia());
     }
 
     @FXML // This method is called by the FXMLLoader when initialization is complete
@@ -121,8 +102,8 @@ public class FXMLController {
     
     public void setModel(Model model) {
     	this.model = model;
-    	dao = new RiversDAO();
-    	this.boxRiver.getItems().addAll(dao.getAllRivers());
+    	
+    	this.boxRiver.getItems().addAll(this.model.getRivers());
     	
     }
 }
